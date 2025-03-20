@@ -1,11 +1,11 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Azure.Extensions.AspNetCore.Configuration.Secrets;
+using Microsoft.Extensions.Configuration;
 using Serilog;
 using Soenneker.Enums.DeployEnvironment;
-using System.Diagnostics.Contracts;
-using Azure.Extensions.AspNetCore.Configuration.Secrets;
-using Soenneker.Extensions.Enumerable;
 using Soenneker.Extensions.Configuration;
+using Soenneker.Extensions.Enumerable;
 using Soenneker.Extensions.String;
+using System.Diagnostics.Contracts;
 
 namespace Soenneker.KeyVault.Util.Extensions;
 
