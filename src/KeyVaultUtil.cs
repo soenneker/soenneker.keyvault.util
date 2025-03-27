@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Azure;
+﻿using Azure;
 using Azure.Core;
 using Azure.Identity;
 using Azure.Security.KeyVault.Certificates;
@@ -10,8 +7,13 @@ using Microsoft.Extensions.Configuration;
 using Serilog;
 using Soenneker.Enums.DeployEnvironment;
 using Soenneker.Extensions.Configuration;
-using Soenneker.KeyVault.Util.Abstract;
 using Soenneker.Extensions.String;
+using Soenneker.Extensions.Task;
+using Soenneker.KeyVault.Util.Abstract;
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Soenneker.KeyVault.Util;
 
@@ -99,13 +101,13 @@ public class KeyVaultUtil : IKeyVaultUtil
         Log.Information("-------------------------------------");
     }
 
-    public async ValueTask<KeyVaultSecret?> GetSecret(string name)
+    public async ValueTask<KeyVaultSecret?> GetSecret(string name, CancellationToken cancellationToken = default)
     {
         Log.Debug("Getting Key Vault key \"{name}\" ...", name);
 
         try
         {
-            Response<KeyVaultSecret>? response = await SecretClient.Value.GetSecretAsync(name);
+            Response<KeyVaultSecret>? response = await SecretClient.Value.GetSecretAsync(name, cancellationToken: cancellationToken).NoSync();
             return response.Value;
         }
         catch (RequestFailedException ex) when (ex.Status == 404)
@@ -115,7 +117,7 @@ public class KeyVaultUtil : IKeyVaultUtil
         }
     }
 
-    public async ValueTask SetSecret(string name, string value, Dictionary<string, string>? tags = null)
+    public async ValueTask SetSecret(string name, string value, Dictionary<string, string>? tags = null, CancellationToken cancellationToken = default)
     {
         Log.Information("Setting Key Vault entry -> {name} ...", name);
 
@@ -127,10 +129,10 @@ public class KeyVaultUtil : IKeyVaultUtil
                 secret.Properties.Tags[tag.Key] = tag.Value;
         }
 
-        await SecretClient.Value.SetSecretAsync(secret);
+        await SecretClient.Value.SetSecretAsync(secret, cancellationToken).NoSync();
     }
 
-    public async ValueTask<KeyVaultCertificateWithPolicy> ImportCertificate(byte[] certificate, string password, string name, string subject, string keyVaultUri)
+    public async ValueTask<KeyVaultCertificateWithPolicy> ImportCertificate(byte[] certificate, string password, string name, string subject, string keyVaultUri, CancellationToken cancellationToken = default)
     {
         if (password.IsNullOrEmpty())
             throw new Exception("A password is required for PFX certificate import");
@@ -147,7 +149,7 @@ public class KeyVaultUtil : IKeyVaultUtil
             Password = password
         };
 
-        KeyVaultCertificateWithPolicy? certificatePolicy = (await _certificateClient.Value.ImportCertificateAsync(importOptions)).Value;
+        KeyVaultCertificateWithPolicy? certificatePolicy = (await _certificateClient.Value.ImportCertificateAsync(importOptions, cancellationToken).NoSync()).Value;
 
         Log.Debug("Finished uploading certificate to key vault");
 
