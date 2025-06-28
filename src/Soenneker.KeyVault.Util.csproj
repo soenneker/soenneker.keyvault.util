@@ -56,6 +56,6 @@
         <PackageReference Include="Serilog" Version="4.3.0" />
         <PackageReference Include="Soenneker.Enums.DeployEnvironment" Version="3.0.176" />
         <PackageReference Include="Soenneker.Extensions.Configuration" Version="3.0.705" />
-        <PackageReference Include="Soenneker.Extensions.Enumerable" Version="3.0.556" />
+        <PackageReference Include="Soenneker.Extensions.Enumerable" Version="3.0.557" />
     </ItemGroup>
 </Project>
