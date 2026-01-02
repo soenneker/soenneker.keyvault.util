@@ -14,7 +14,7 @@
         <AssemblyName>Soenneker.KeyVault.Util</AssemblyName>
         <PackageId>Soenneker.KeyVault.Util</PackageId>
         <PackageTags>keyvault util utils config configuration key vault azure microsoft keyvaultutil csharp dotnet c# .net</PackageTags>
-        <Copyright>Copyright © 2025 Jake Soenneker</Copyright>
+        <Copyright>Copyright © 2025-2026 Jake Soenneker</Copyright>
         <Authors>Jake Soenneker</Authors>
         <Company>https://soenneker.com</Company>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
