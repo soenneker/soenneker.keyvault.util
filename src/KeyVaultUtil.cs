@@ -5,6 +5,7 @@ using Azure.Security.KeyVault.Certificates;
 using Azure.Security.KeyVault.Secrets;
 using Microsoft.Extensions.Configuration;
 using Serilog;
+using Serilog.Events;
 using Soenneker.Enums.DeployEnvironment;
 using Soenneker.Extensions.Configuration;
 using Soenneker.Extensions.String;
@@ -17,62 +18,65 @@ using System.Threading.Tasks;
 
 namespace Soenneker.KeyVault.Util;
 
-///<inheritdoc cref="IKeyVaultUtil"/>
-public class KeyVaultUtil : IKeyVaultUtil
+/// <inheritdoc cref="IKeyVaultUtil"/>
+public sealed class KeyVaultUtil : IKeyVaultUtil
 {
+    private static readonly SecretClientOptions _secretClientOptions = CreateSecretClientOptions();
+
+    private readonly string? _tenantId;
+    private readonly string? _clientId;
+    private readonly string? _clientSecret;
+    private readonly Uri? _keyVaultUri;
+
     private readonly Lazy<ClientSecretCredential> _clientSecretCredential;
     public readonly Lazy<SecretClient> SecretClient;
     private readonly Lazy<CertificateClient> _certificateClient;
 
-    private readonly IConfiguration? _configuration;
-
-    /// <summary> DI (Lazy Configuration Retrieval) </summary>
+    /// <summary>DI (config-backed)</summary>
     public KeyVaultUtil(IConfiguration configuration)
     {
-        _configuration = configuration;
-        _clientSecretCredential = new Lazy<ClientSecretCredential>(InitializeCredential, true);
-        SecretClient = new Lazy<SecretClient>(InitializeSecretClient, true);
-        _certificateClient = new Lazy<CertificateClient>(InitializeCertificateClient, true);
+        // Pull config ONCE (avoids repeated dictionary lookups and string allocations).
+        _tenantId = configuration.GetValueStrict<string>("Azure:TenantId");
+        _clientId = configuration.GetValueStrict<string>("Azure:AppRegistration:Id");
+        _clientSecret = configuration.GetValueStrict<string>("Azure:AppRegistration:Secret");
+        var keyVaultUriString = configuration.GetValueStrict<string>("Azure:KeyVault:Uri");
+        _keyVaultUri = new Uri(keyVaultUriString, UriKind.Absolute);
+
+        DeployEnvironment deployEnvironment = DeployEnvironment.FromValue(configuration.GetValueStrict<string>("ASPNETCORE_ENVIRONMENT"));
+
+        // Log once; gate expensive Mask()/formatting behind level check.
+        LogConfigurationIfEnabled(_tenantId, _clientId, _clientSecret, keyVaultUriString, deployEnvironment);
+
+        _clientSecretCredential = new Lazy<ClientSecretCredential>(CreateCredential, isThreadSafe: true);
+        SecretClient = new Lazy<SecretClient>(CreateSecretClient, isThreadSafe: true);
+        _certificateClient = new Lazy<CertificateClient>(CreateCertificateClient, isThreadSafe: true);
     }
 
+    /// <summary>Manual (no IConfiguration)</summary>
     public KeyVaultUtil(string tenantId, string clientId, string clientSecret, string keyVaultUri, DeployEnvironment deployEnvironment)
     {
-        _clientSecretCredential = new Lazy<ClientSecretCredential>(() =>
-        {
-            LogConfiguration(tenantId, clientId, clientSecret, keyVaultUri, deployEnvironment);
-            return new ClientSecretCredential(tenantId, clientId, clientSecret);
-        }, true);
+        _tenantId = tenantId;
+        _clientId = clientId;
+        _clientSecret = clientSecret;
+        _keyVaultUri = new Uri(keyVaultUri, UriKind.Absolute);
 
-        SecretClient = new Lazy<SecretClient>(() => new SecretClient(new Uri(keyVaultUri), _clientSecretCredential.Value, new SecretClientOptions
-        {
-            Retry =
-            {
-                Delay = TimeSpan.FromSeconds(2),
-                MaxDelay = TimeSpan.FromSeconds(16),
-                MaxRetries = 5,
-                Mode = RetryMode.Exponential
-            }
-        }), true);
+        LogConfigurationIfEnabled(_tenantId, _clientId, _clientSecret, keyVaultUri, deployEnvironment);
 
-        _certificateClient = new Lazy<CertificateClient>(() => new CertificateClient(new Uri(keyVaultUri), _clientSecretCredential.Value), true);
+        _clientSecretCredential = new Lazy<ClientSecretCredential>(CreateCredential, isThreadSafe: true);
+        SecretClient = new Lazy<SecretClient>(CreateSecretClient, isThreadSafe: true);
+        _certificateClient = new Lazy<CertificateClient>(CreateCertificateClient, isThreadSafe: true);
     }
 
-    private ClientSecretCredential InitializeCredential()
-    {
-        var tenantId = _configuration!.GetValueStrict<string>("Azure:TenantId");
-        var clientId = _configuration.GetValueStrict<string>("Azure:AppRegistration:Id");
-        var clientSecret = _configuration.GetValueStrict<string>("Azure:AppRegistration:Secret");
-        var keyVaultUri = _configuration.GetValueStrict<string>("Azure:KeyVault:Uri");
-        DeployEnvironment deployEnvironment = DeployEnvironment.FromValue(_configuration.GetValueStrict<string>("ASPNETCORE_ENVIRONMENT"));
+    private ClientSecretCredential CreateCredential() => new(_tenantId!, _clientId!, _clientSecret!);
 
-        LogConfiguration(tenantId, clientId, clientSecret, keyVaultUri, deployEnvironment);
-        return new ClientSecretCredential(tenantId, clientId, clientSecret);
-    }
+    private SecretClient CreateSecretClient() => new(_keyVaultUri!, _clientSecretCredential.Value, _secretClientOptions);
 
-    private SecretClient InitializeSecretClient()
+    private CertificateClient CreateCertificateClient() => new(_keyVaultUri!, _clientSecretCredential.Value);
+
+    private static SecretClientOptions CreateSecretClientOptions()
     {
-        var keyVaultUri = _configuration!.GetValueStrict<string>("Azure:KeyVault:Uri");
-        return new SecretClient(new Uri(keyVaultUri), _clientSecretCredential.Value, new SecretClientOptions
+        // Construct once and reuse; this is safe since we never mutate after creation.
+        return new SecretClientOptions
         {
             Retry =
             {
@@ -81,63 +85,73 @@ public class KeyVaultUtil : IKeyVaultUtil
                 MaxRetries = 5,
                 Mode = RetryMode.Exponential
             }
-        });
+        };
     }
 
-    private CertificateClient InitializeCertificateClient()
+    private static void LogConfigurationIfEnabled(string tenantId, string clientId, string clientSecret, string keyVaultUri,
+        DeployEnvironment deployEnvironment)
     {
-        var keyVaultUri = _configuration!.GetValueStrict<string>("Azure:KeyVault:Uri");
-        return new CertificateClient(new Uri(keyVaultUri), _clientSecretCredential.Value);
-    }
+        if (!Log.IsEnabled(LogEventLevel.Information))
+            return;
 
-    private static void LogConfiguration(string tenantId, string clientId, string clientSecret, string keyVaultUri, DeployEnvironment deployEnvironment)
-    {
         Log.Information("---- {name} Configuration ----", nameof(KeyVaultUtil));
         Log.Information("ASPNETCORE_ENVIRONMENT => {environment}", deployEnvironment);
         Log.Information("Azure:KeyVault:Uri => {url}", keyVaultUri);
         Log.Information("Azure:TenantId => {tenantId}", tenantId);
         Log.Information("Azure:AppRegistration:Id => {clientId}", clientId);
+
         Log.Information("Azure:AppRegistration:Secret => {clientSecret}", clientSecret.Mask());
+
         Log.Information("-------------------------------------");
     }
 
     public async ValueTask<KeyVaultSecret?> GetSecret(string name, CancellationToken cancellationToken = default)
     {
-        Log.Debug("Getting Key Vault key \"{name}\" ...", name);
+        if (Log.IsEnabled(LogEventLevel.Debug))
+            Log.Debug("Getting Key Vault key \"{name}\" ...", name);
 
         try
         {
-            Response<KeyVaultSecret>? response = await SecretClient.Value.GetSecretAsync(name, cancellationToken: cancellationToken).NoSync();
+            Response<KeyVaultSecret> response = await SecretClient.Value.GetSecretAsync(name, cancellationToken: cancellationToken)
+                                                                  .NoSync();
+
             return response.Value;
         }
         catch (RequestFailedException ex) when (ex.Status == 404)
         {
-            Log.Warning("Could not find secret \"{name}\" in Key Vault", name);
+            if (Log.IsEnabled(LogEventLevel.Warning))
+                Log.Warning("Could not find secret \"{name}\" in Key Vault", name);
+
             return null;
         }
     }
 
     public async ValueTask SetSecret(string name, string value, Dictionary<string, string>? tags = null, CancellationToken cancellationToken = default)
     {
-        Log.Information("Setting Key Vault entry -> {name} ...", name);
+        if (Log.IsEnabled(LogEventLevel.Information))
+            Log.Information("Setting Key Vault entry -> {name} ...", name);
 
-        KeyVaultSecret secret = new(name, value);
+        var secret = new KeyVaultSecret(name, value);
 
-        if (tags is not null)
+        if (tags is not null && tags.Count != 0)
         {
+            // Avoid enumerator interface boxing by iterating KeyValuePair directly (Dictionary uses a struct enumerator).
             foreach (KeyValuePair<string, string> tag in tags)
                 secret.Properties.Tags[tag.Key] = tag.Value;
         }
 
-        await SecretClient.Value.SetSecretAsync(secret, cancellationToken).NoSync();
+        await SecretClient.Value.SetSecretAsync(secret, cancellationToken)
+                          .NoSync();
     }
 
-    public async ValueTask<KeyVaultCertificateWithPolicy> ImportCertificate(byte[] certificate, string password, string name, string subject, string keyVaultUri, CancellationToken cancellationToken = default)
+    public async ValueTask<KeyVaultCertificateWithPolicy> ImportCertificate(byte[] certificate, string password, string name, string subject,
+        string keyVaultUri, CancellationToken cancellationToken = default)
     {
         if (password.IsNullOrEmpty())
-            throw new Exception("A password is required for PFX certificate import");
+            throw new ArgumentException("A password is required for PFX certificate import", nameof(password));
 
-        Log.Information("Beginning to upload certificate to key vault {name}", keyVaultUri);
+        if (Log.IsEnabled(LogEventLevel.Information))
+            Log.Information("Beginning to upload certificate to key vault {name}", keyVaultUri);
 
         var importOptions = new ImportCertificateOptions(name, certificate)
         {
@@ -149,9 +163,11 @@ public class KeyVaultUtil : IKeyVaultUtil
             Password = password
         };
 
-        KeyVaultCertificateWithPolicy? certificatePolicy = (await _certificateClient.Value.ImportCertificateAsync(importOptions, cancellationToken).NoSync()).Value;
+        KeyVaultCertificateWithPolicy certificatePolicy = (await _certificateClient.Value.ImportCertificateAsync(importOptions, cancellationToken)
+                                                                                   .NoSync()).Value;
 
-        Log.Debug("Finished uploading certificate to key vault");
+        if (Log.IsEnabled(LogEventLevel.Debug))
+            Log.Debug("Finished uploading certificate to key vault");
 
         return certificatePolicy;
     }
