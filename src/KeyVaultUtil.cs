@@ -42,7 +42,7 @@ public sealed class KeyVaultUtil : IKeyVaultUtil
         var keyVaultUriString = configuration.GetValueStrict<string>("Azure:KeyVault:Uri");
         _keyVaultUri = new Uri(keyVaultUriString, UriKind.Absolute);
 
-        DeployEnvironment deployEnvironment = DeployEnvironment.FromValue(configuration.GetValueStrict<string>("ASPNETCORE_ENVIRONMENT"));
+        DeployEnvironment deployEnvironment = DeployEnvironment.FromValue(configuration.GetValueStrict<string>("Environment"));
 
         // Log once; gate expensive Mask()/formatting behind level check.
         LogConfigurationIfEnabled(_tenantId, _clientId, _clientSecret, keyVaultUriString, deployEnvironment);
