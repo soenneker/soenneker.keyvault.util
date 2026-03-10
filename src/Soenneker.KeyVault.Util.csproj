@@ -52,7 +52,7 @@
         <PackageReference Include="Azure.Security.KeyVault.Certificates" Version="4.8.0" />
         <PackageReference Include="Serilog" Version="4.3.1" />
         <PackageReference Include="Soenneker.Enums.DeployEnvironment" Version="4.0.203" />
-        <PackageReference Include="Soenneker.Extensions.Configuration" Version="4.0.791" />
+        <PackageReference Include="Soenneker.Extensions.Configuration" Version="4.0.792" />
         <PackageReference Include="Soenneker.Extensions.Enumerable" Version="4.0.605" />
     </ItemGroup>
 </Project>
