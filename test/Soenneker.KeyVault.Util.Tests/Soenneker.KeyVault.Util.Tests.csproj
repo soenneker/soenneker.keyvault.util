@@ -27,7 +27,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\Soenneker.KeyVault.Util.csproj" />
+        <ProjectReference Include="..\..\src\Soenneker.KeyVault.Util\Soenneker.KeyVault.Util.csproj" />
     </ItemGroup>
 
     <ItemGroup>
