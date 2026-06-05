@@ -29,10 +29,12 @@ public sealed class KeyVaultUtil : IKeyVaultUtil
     private readonly Uri? _keyVaultUri;
 
     private readonly Lazy<ClientSecretCredential> _clientSecretCredential;
+    /// <summary>
+    /// The secret client.
+    /// </summary>
     public readonly Lazy<SecretClient> SecretClient;
     private readonly Lazy<CertificateClient> _certificateClient;
 
-    /// <summary>DI (config-backed)</summary>
     public KeyVaultUtil(IConfiguration configuration)
     {
         // Pull config ONCE (avoids repeated dictionary lookups and string allocations).
@@ -52,7 +54,6 @@ public sealed class KeyVaultUtil : IKeyVaultUtil
         _certificateClient = new Lazy<CertificateClient>(CreateCertificateClient, isThreadSafe: true);
     }
 
-    /// <summary>Manual (no IConfiguration)</summary>
     public KeyVaultUtil(string tenantId, string clientId, string clientSecret, string keyVaultUri, DeployEnvironment deployEnvironment)
     {
         _tenantId = tenantId;
