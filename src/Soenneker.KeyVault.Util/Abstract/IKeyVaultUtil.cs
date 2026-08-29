@@ -24,10 +24,11 @@ public interface IKeyVaultUtil
     /// <summary>
     /// Sets a secret in Azure Key Vault.
     /// </summary>
-    /// <param name="name">The name of the secret.</param>
-    /// <param name="value">The value of the secret.</param>
+    /// <param name="name">Name of the Key Vault value to target.</param>
+    /// <param name="value">Secret value to store in Key Vault.</param>
     /// <param name="tags">Optional dictionary of tags to associate with the secret.</param>
-    /// <param name="cancellationToken"></param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    /// <returns>A task that completes when the secret has been stored.</returns>
     ValueTask SetSecret(string name, string value, Dictionary<string, string>? tags = null, CancellationToken cancellationToken = default);
 
     /// <summary>

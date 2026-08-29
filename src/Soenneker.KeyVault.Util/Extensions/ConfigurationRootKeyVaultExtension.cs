@@ -18,6 +18,10 @@ public static class ConfigurationRootKeyVaultExtension
     /// <summary>
     /// Rebuilds the configuration root to include Key Vault if needed. The returned configuration should be used to access Key Vault entries.
     /// </summary>
+    /// <param name="configRoot">Config Root for the add key vault operation.</param>
+    /// <param name="builder">Builder to configure.</param>
+    /// <param name="args">Command-line arguments passed to the application.</param>
+    /// <returns>The resulting configuration Root.</returns>
     [Pure]
     public static IConfigurationRoot AddKeyVault(this IConfigurationRoot configRoot, IConfigurationBuilder builder, string[]? args = null)
     {
