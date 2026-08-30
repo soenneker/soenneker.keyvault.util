@@ -36,7 +36,8 @@ public static class ConfigurationRootKeyVaultExtension
 
         Log.Information("Source: {source}", source);
 
-        DeployEnvironment? deployEnvironment = DeployEnvironment.FromName(configRoot["Environment"]);
+        string environment = configRoot.GetValueStrict<string>("Environment");
+        DeployEnvironment deployEnvironment = DeployEnvironment.FromName(environment);
 
         bool keyVaultEnabled = configRoot["Azure:KeyVault:Enabled"].ToBool();
 

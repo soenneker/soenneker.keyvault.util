@@ -1,11 +1,12 @@
 [![](https://img.shields.io/nuget/v/soenneker.keyvault.util.svg?style=for-the-badge)](https://www.nuget.org/packages/soenneker.keyvault.util/)
+[![](https://img.shields.io/github/actions/workflow/status/soenneker/soenneker.keyvault.util/build-and-test.yml?style=for-the-badge)](https://github.com/soenneker/soenneker.keyvault.util/actions/workflows/build-and-test.yml)
 [![](https://img.shields.io/github/actions/workflow/status/soenneker/soenneker.keyvault.util/publish-package.yml?style=for-the-badge)](https://github.com/soenneker/soenneker.keyvault.util/actions/workflows/publish-package.yml)
 [![](https://img.shields.io/nuget/dt/soenneker.keyvault.util.svg?style=for-the-badge)](https://www.nuget.org/packages/soenneker.keyvault.util/)
 [![](https://img.shields.io/github/actions/workflow/status/soenneker/soenneker.keyvault.util/codeql.yml?label=CodeQL&style=for-the-badge)](https://github.com/soenneker/soenneker.keyvault.util/actions/workflows/codeql.yml)
 
 # Soenneker.KeyVault.Util
 
-A utility library for Azure Key Vault related operations.
+Reads and writes Azure Key Vault secrets, imports PFX certificates, and can add Key Vault as a configuration provider.
 
 ## Install
 
@@ -13,35 +14,72 @@ A utility library for Azure Key Vault related operations.
 dotnet add package Soenneker.KeyVault.Util
 ```
 
-## Quick start
+## Configuration
 
-```csharp
-using Soenneker.KeyVault.Util.Registrars;
-using Microsoft.Extensions.DependencyInjection;
-
-var services = new ServiceCollection();
-var result = services.AddKeyVaultUtilAsSingleton();
+```json
+{
+  "Environment": "Development",
+  "Azure": {
+    "TenantId": "<tenant ID>",
+    "AppRegistration": {
+      "Id": "<application/client ID>",
+      "Secret": "<client secret>"
+    },
+    "KeyVault": {
+      "Uri": "https://my-vault.vault.azure.net/",
+      "Enabled": true
+    }
+  }
+}
 ```
 
-Adds `IKeyVaultUtil` as a singleton service.
+The utility authenticates with `ClientSecretCredential`. Keep the client secret in a protected configuration source such as environment variables or a development secret store; do not commit it in application settings.
 
-## What you get
+## Register and use secrets
 
-- `IKeyVaultUtil` — A utility library for Azure Key Vault related operations.
-- `ConfigurationRootKeyVaultExtension` — Rebuilds the configuration root to include Azure Key Vault if enabled. Returns the updated configuration for accessing Key Vault entries.
-- `KeyVaultUtilRegistrar` — A utility library for Azure Key Vault related operations.
+```csharp
+using Soenneker.KeyVault.Util.Abstract;
+using Soenneker.KeyVault.Util.Registrars;
 
-## API at a glance
+services.AddKeyVaultUtilAsSingleton();
 
-| API | What it does | Result / important behavior |
-| --- | --- | --- |
-| `IKeyVaultUtil.GetSecret(name, cancellationToken)` | Retrieves a secret from Azure Key Vault. | The secret value or null if not found. |
-| `IKeyVaultUtil.SetSecret(name, value, tags, cancellationToken)` | Sets a secret in Azure Key Vault. | A task that completes when the secret has been stored. |
-| `IKeyVaultUtil.ImportCertificate(certificate, password, name, subject, keyVaultUri, cancellationToken)` | Imports a certificate into Azure Key Vault. | The imported Key Vault certificate with policy. |
-| `ConfigurationRootKeyVaultExtension.AddKeyVault(configRoot, builder, args)` | Rebuilds the configuration root to include Key Vault if needed. The returned configuration should be used to access Key Vault entries. | The resulting configuration Root. |
-| `KeyVaultUtilRegistrar.AddKeyVaultUtilAsSingleton(services)` | Adds `IKeyVaultUtil` as a singleton service. | The same service collection, so additional registrations can be chained. |
-| `KeyVaultUtilRegistrar.AddKeyVaultUtilAsScoped(services)` | Adds `IKeyVaultUtil` as a scoped service. | The same service collection, so additional registrations can be chained. |
+KeyVaultSecret? secret = await keyVault.GetSecret(
+    "ApiPassword",
+    cancellationToken);
 
-## Practical notes
+await keyVault.SetSecret(
+    "ApiPassword",
+    rotatedPassword,
+    new Dictionary<string, string>
+    {
+        ["owner"] = "payments"
+    },
+    cancellationToken);
+```
 
-- Cancellation stops pending work; it does not undo work that has already completed.
+`GetSecret()` returns the latest enabled version and returns null only when Azure responds with 404. Authentication, authorization, throttling, and service failures propagate as `RequestFailedException`. `SetSecret()` creates a new secret version and applies the supplied tags.
+
+## Import a PFX certificate
+
+```csharp
+byte[] pfx = await File.ReadAllBytesAsync("signing.pfx", cancellationToken);
+
+KeyVaultCertificateWithPolicy imported = await keyVault.ImportCertificate(
+    pfx,
+    pfxPassword,
+    name: "signing-certificate",
+    subject: "CN=signing.example.com",
+    keyVaultUri: "https://cert-vault.vault.azure.net/",
+    cancellationToken);
+```
+
+The `keyVaultUri` argument is the destination for that import and may differ from the vault configured for secret operations. Private keys are non-exportable by default. Use the overload with `exportable: true` only when downstream key export is an explicit requirement.
+
+## Add Key Vault to configuration
+
+```csharp
+IConfigurationRoot configuration = builder.Build();
+configuration = configuration.AddKeyVault(builder, args);
+```
+
+When `Azure:KeyVault:Enabled` is true, `AddKeyVault()` adds the provider and rebuilds the configuration. Always use its returned root. When disabled, it returns the original root unchanged. Azure's configuration provider maps double hyphens in secret names to configuration delimiters, so `Database--Password` is read as `Database:Password`.

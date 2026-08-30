@@ -18,7 +18,6 @@ using System.Threading.Tasks;
 
 namespace Soenneker.KeyVault.Util;
 
-/// <inheritdoc cref="IKeyVaultUtil"/>
 public sealed class KeyVaultUtil : IKeyVaultUtil
 {
     private static readonly SecretClientOptions _secretClientOptions = CreateSecretClientOptions();
@@ -33,7 +32,6 @@ public sealed class KeyVaultUtil : IKeyVaultUtil
     /// The secret client.
     /// </summary>
     public readonly Lazy<SecretClient> SecretClient;
-    private readonly Lazy<CertificateClient> _certificateClient;
 
     public KeyVaultUtil(IConfiguration configuration)
     {
@@ -51,7 +49,6 @@ public sealed class KeyVaultUtil : IKeyVaultUtil
 
         _clientSecretCredential = new Lazy<ClientSecretCredential>(CreateCredential, isThreadSafe: true);
         SecretClient = new Lazy<SecretClient>(CreateSecretClient, isThreadSafe: true);
-        _certificateClient = new Lazy<CertificateClient>(CreateCertificateClient, isThreadSafe: true);
     }
 
     public KeyVaultUtil(string tenantId, string clientId, string clientSecret, string keyVaultUri, DeployEnvironment deployEnvironment)
@@ -65,14 +62,11 @@ public sealed class KeyVaultUtil : IKeyVaultUtil
 
         _clientSecretCredential = new Lazy<ClientSecretCredential>(CreateCredential, isThreadSafe: true);
         SecretClient = new Lazy<SecretClient>(CreateSecretClient, isThreadSafe: true);
-        _certificateClient = new Lazy<CertificateClient>(CreateCertificateClient, isThreadSafe: true);
     }
 
     private ClientSecretCredential CreateCredential() => new(_tenantId!, _clientId!, _clientSecret!);
 
     private SecretClient CreateSecretClient() => new(_keyVaultUri!, _clientSecretCredential.Value, _secretClientOptions);
-
-    private CertificateClient CreateCertificateClient() => new(_keyVaultUri!, _clientSecretCredential.Value);
 
     private static SecretClientOptions CreateSecretClientOptions()
     {
@@ -145,8 +139,12 @@ public sealed class KeyVaultUtil : IKeyVaultUtil
                           .NoSync();
     }
 
+    public ValueTask<KeyVaultCertificateWithPolicy> ImportCertificate(byte[] certificate, string password, string name, string subject,
+        string keyVaultUri, CancellationToken cancellationToken = default) =>
+        ImportCertificate(certificate, password, name, subject, keyVaultUri, exportable: false, cancellationToken);
+
     public async ValueTask<KeyVaultCertificateWithPolicy> ImportCertificate(byte[] certificate, string password, string name, string subject,
-        string keyVaultUri, CancellationToken cancellationToken = default)
+        string keyVaultUri, bool exportable, CancellationToken cancellationToken = default)
     {
         if (password.IsNullOrEmpty())
             throw new ArgumentException("A password is required for PFX certificate import", nameof(password));
@@ -159,12 +157,13 @@ public sealed class KeyVaultUtil : IKeyVaultUtil
             Policy = new CertificatePolicy(WellKnownIssuerNames.Self, subject)
             {
                 ContentType = CertificateContentType.Pkcs12,
-                Exportable = true
+                Exportable = exportable
             },
             Password = password
         };
 
-        KeyVaultCertificateWithPolicy certificatePolicy = (await _certificateClient.Value.ImportCertificateAsync(importOptions, cancellationToken)
+        var certificateClient = new CertificateClient(new Uri(keyVaultUri, UriKind.Absolute), _clientSecretCredential.Value);
+        KeyVaultCertificateWithPolicy certificatePolicy = (await certificateClient.ImportCertificateAsync(importOptions, cancellationToken)
                                                                                    .NoSync()).Value;
 
         if (Log.IsEnabled(LogEventLevel.Debug))
