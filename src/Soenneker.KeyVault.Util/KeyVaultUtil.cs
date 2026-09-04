@@ -18,6 +18,7 @@ using System.Threading.Tasks;
 
 namespace Soenneker.KeyVault.Util;
 
+/// <inheritdoc cref="IKeyVaultUtil" />
 public sealed class KeyVaultUtil : IKeyVaultUtil
 {
     private static readonly SecretClientOptions _secretClientOptions = CreateSecretClientOptions();
