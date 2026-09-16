@@ -53,8 +53,8 @@
         <PackageReference Include="Azure.Extensions.AspNetCore.Configuration.Secrets" Version="1.5.2" />
         <PackageReference Include="Azure.Security.KeyVault.Certificates" Version="4.9.1" />
         <PackageReference Include="Serilog" Version="4.4.0" />
-        <PackageReference Include="Soenneker.Enums.DeployEnvironment" Version="4.0.241" />
-        <PackageReference Include="Soenneker.Extensions.Configuration" Version="4.0.891" />
-        <PackageReference Include="Soenneker.Extensions.Enumerable" Version="4.0.666" />
+        <PackageReference Include="Soenneker.Enums.DeployEnvironment" Version="4.0.242" />
+        <PackageReference Include="Soenneker.Extensions.Configuration" Version="4.0.892" />
+        <PackageReference Include="Soenneker.Extensions.Enumerable" Version="4.0.667" />
     </ItemGroup>
 </Project>
