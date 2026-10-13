@@ -36,7 +36,7 @@ public static class ConfigurationRootKeyVaultExtension
 
         Log.Information("Source: {source}", source);
 
-        string environment = configRoot.GetValueStrict<string>("Environment");
+        string environment = configRoot.GetStringStrict("Environment");
         DeployEnvironment deployEnvironment = DeployEnvironment.FromName(environment);
 
         bool keyVaultEnabled = configRoot["Azure:KeyVault:Enabled"].ToBool();
@@ -50,10 +50,10 @@ public static class ConfigurationRootKeyVaultExtension
 
         // Add the Azure Key Vault provider only if it's not already included. This ensures only explicitly configured keys are available.
 
-        var tenantId = configRoot.GetValueStrict<string>("Azure:TenantId");
-        var clientId = configRoot.GetValueStrict<string>("Azure:AppRegistration:Id");
-        var clientSecret = configRoot.GetValueStrict<string>("Azure:AppRegistration:Secret");
-        var keyVaultUri = configRoot.GetValueStrict<string>("Azure:KeyVault:Uri");
+        var tenantId = configRoot.GetStringStrict("Azure:TenantId");
+        var clientId = configRoot.GetStringStrict("Azure:AppRegistration:Id");
+        var clientSecret = configRoot.GetStringStrict("Azure:AppRegistration:Secret");
+        var keyVaultUri = configRoot.GetStringStrict("Azure:KeyVault:Uri");
 
         var keyVaultUtil = new KeyVaultUtil(tenantId, clientId, clientSecret, keyVaultUri, deployEnvironment);
 

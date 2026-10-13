@@ -37,13 +37,13 @@ public sealed class KeyVaultUtil : IKeyVaultUtil
     public KeyVaultUtil(IConfiguration configuration)
     {
         // Pull config ONCE (avoids repeated dictionary lookups and string allocations).
-        _tenantId = configuration.GetValueStrict<string>("Azure:TenantId");
-        _clientId = configuration.GetValueStrict<string>("Azure:AppRegistration:Id");
-        _clientSecret = configuration.GetValueStrict<string>("Azure:AppRegistration:Secret");
-        var keyVaultUriString = configuration.GetValueStrict<string>("Azure:KeyVault:Uri");
+        _tenantId = configuration.GetStringStrict("Azure:TenantId");
+        _clientId = configuration.GetStringStrict("Azure:AppRegistration:Id");
+        _clientSecret = configuration.GetStringStrict("Azure:AppRegistration:Secret");
+        var keyVaultUriString = configuration.GetStringStrict("Azure:KeyVault:Uri");
         _keyVaultUri = new Uri(keyVaultUriString, UriKind.Absolute);
 
-        DeployEnvironment deployEnvironment = DeployEnvironment.FromValue(configuration.GetValueStrict<string>("Environment"));
+        DeployEnvironment deployEnvironment = DeployEnvironment.FromValue(configuration.GetStringStrict("Environment"));
 
         // Log once; gate expensive Mask()/formatting behind level check.
         LogConfigurationIfEnabled(_tenantId, _clientId, _clientSecret, keyVaultUriString, deployEnvironment);
