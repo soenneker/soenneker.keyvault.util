@@ -58,6 +58,6 @@
         <PackageReference Include="Soenneker.Enums.DeployEnvironment" Version="11.0.262" />
         <PackageReference Include="Soenneker.Extensions.Configuration" Version="11.0.916" />
         <PackageReference Include="Soenneker.Extensions.Enumerable" Version="11.0.698" />
-        <PackageReference Include="Soenneker.Extensions.String" Version="11.0.813" />
+        <PackageReference Include="Soenneker.Extensions.String" Version="11.0.814" />
     </ItemGroup>
 </Project>
